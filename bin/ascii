@@ -11,17 +11,20 @@ our $optControlsOnly;
 our $optBase = 16;
 our $optLatin1;
 our $optLatin1Only;
+our $optRowMajor = 0;
 
 Getopt::Long::Configure(qw(gnu_compat bundling no_ignore_case));
 Getopt::Long::GetOptions(
     'help' => sub { help(); exit(0); },
-    'c|controls'      => \$optControls,
-    'C|controls-only' => \$optControlsOnly,
-    'o|octal'         => sub { $optBase = 8; },
-    'd|decimal'       => sub { $optBase = 10; },
-    'x|hexadecimal'   => sub { $optBase = 16; },
-    'l|latin-1'       => \$optLatin1,
-    'L|latin-1-only'  => \$optLatin1Only,
+    'c|controls'           => \$optControls,
+    'C|controls-only'      => \$optControlsOnly,
+    'o|octal'              => sub { $optBase = 8; },
+    'd|decimal'            => sub { $optBase = 10; },
+    'x|hexadecimal'        => sub { $optBase = 16; },
+    'l|latin-1'            => \$optLatin1,
+    'L|latin-1-only'       => \$optLatin1Only,
+    'r|row-major-order'    => sub { $optRowMajor = 1; },
+    'k|column-major-order' => sub { $optRowMajor = 0; },
 ) or die("Type 'ascii --help' for help.\n");
 
 our %controls;                 # abbreviations to display for controls
@@ -61,7 +64,12 @@ sub printColumnMajorTable {
     for (my $row = 0; $row < $height; $row += 1) {
         for (my $col = 0; $col < $width; $col += 1) {
             print(' ') if $col;
-            my $idx = $col * $height + $row;
+            my $idx;
+            if ($optRowMajor) {
+                $idx = $row * $width + $col;
+            } else {
+                $idx = $col * $height + $row;
+            }
             my $code;
             foreach my $range (@ranges) {
                 if ($idx <= $range->[1] - $range->[0]) {
