@@ -46,7 +46,7 @@ sub printColumnMajorTable {
             } elsif ($optBase == 8) {
                 printf('0%03o', $code);
             }
-            printf(' %-3s', $controls{$code} // chr($code));
+            printf(' %-3s', char($code));
         }
         print("\n");
     }
@@ -59,41 +59,49 @@ usage:
           [--help]
 END
 
+sub char {
+    my ($code) = @_;
+    my $ctrl = $controls{$code};
+    return chr($code) if !defined $ctrl;
+    my $abbr = $ctrl->{abbr};
+    return $abbr // chr($code);
+}
+
 BEGIN {
     %controls = (
-        0x00 => 'NUL',
-        0x01 => 'SOH',
-        0x02 => 'STX',
-        0x03 => 'ETX',
-        0x04 => 'EOT',
-        0x05 => 'ENQ',
-        0x06 => 'ACK',
-        0x07 => 'BEL',
-        0x08 => 'BS',
-        0x09 => 'HT',
-        0x0a => 'LF',
-        0x0b => 'VT',
-        0x0c => 'FF',
-        0x0d => 'CR',
-        0x0e => 'SO',           # or LS1
-        0x0f => 'SI',           # or LS0
-        0x10 => 'DLE',
-        0x11 => 'DC1',
-        0x12 => 'DC2',
-        0x13 => 'DC3',
-        0x14 => 'DC4',
-        0x15 => 'NAK',
-        0x16 => 'SYN',
-        0x17 => 'ETB',
-        0x18 => 'CAN',
-        0x19 => 'EM',
-        0x1a => 'SUB',
-        0x1b => 'ESC',
-        0x1c => 'IS4',
-        0x1d => 'IS3',
-        0x1e => 'IS2',
-        0x1f => 'IS1',
-        0x20 => 'SP',
-        0x7f => 'DEL',
+        0x00 => { abbr => 'NUL' },
+        0x01 => { abbr => 'SOH' },
+        0x02 => { abbr => 'STX' },
+        0x03 => { abbr => 'ETX' },
+        0x04 => { abbr => 'EOT' },
+        0x05 => { abbr => 'ENQ' },
+        0x06 => { abbr => 'ACK' },
+        0x07 => { abbr => 'BEL' },
+        0x08 => { abbr => 'BS' },
+        0x09 => { abbr => 'HT' },
+        0x0a => { abbr => 'LF' },
+        0x0b => { abbr => 'VT' },
+        0x0c => { abbr => 'FF' },
+        0x0d => { abbr => 'CR' },
+        0x0e => { abbr => 'SO' }, # or LS1
+        0x0f => { abbr => 'SI' }, # or LS0
+        0x10 => { abbr => 'DLE' },
+        0x11 => { abbr => 'DC1' },
+        0x12 => { abbr => 'DC2' },
+        0x13 => { abbr => 'DC3' },
+        0x14 => { abbr => 'DC4' },
+        0x15 => { abbr => 'NAK' },
+        0x16 => { abbr => 'SYN' },
+        0x17 => { abbr => 'ETB' },
+        0x18 => { abbr => 'CAN' },
+        0x19 => { abbr => 'EM' },
+        0x1a => { abbr => 'SUB' },
+        0x1b => { abbr => 'ESC' },
+        0x1c => { abbr => 'IS4' },
+        0x1d => { abbr => 'IS3' },
+        0x1e => { abbr => 'IS2' },
+        0x1f => { abbr => 'IS1' },
+        0x20 => { abbr => 'SP' },
+        0x7f => { abbr => 'DEL' },
     );
 }
