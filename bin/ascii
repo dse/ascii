@@ -45,12 +45,7 @@ sub printTable {
     for (my $row = 0; $row < $height; $row += 1) {
         for (my $col = 0; $col < $width; $col += 1) {
             print(' ') if $col;
-            my $idx;
-            if ($optRowMajor) {
-                $idx = $row * $width + $col;
-            } else {
-                $idx = $col * $height + $row;
-            }
+            my $idx = computeIndex($width, $height, $col, $row);
             my $code = computeCodeFromIndex($idx, @ranges);
             if (!defined $code) {
                 print('         ');
@@ -77,12 +72,7 @@ sub printAlternateTable {
     for (my $row = 0; $row < $height; $row += 1) {
         for (my $col = 0; $col < $width; $col += 1) {
             print(' ') if $col;
-            my $idx;
-            if ($optRowMajor) {
-                $idx = $row * $width + $col;
-            } else {
-                $idx = $col * $height + $row;
-            }
+            my $idx = computeIndex($width, $height, $col, $row);
             my $code = computeCodeFromIndex($idx, @ranges);
             if (!defined $code) {
                 print('    ');
@@ -99,12 +89,7 @@ sub printAlternateTable {
         print("\n");
         for (my $col = 0; $col < $width; $col += 1) {
             print(' ') if $col;
-            my $idx;
-            if ($optRowMajor) {
-                $idx = $row * $width + $col;
-            } else {
-                $idx = $col * $height + $row;
-            }
+            my $idx = computeIndex($width, $height, $col, $row);
             my $code = computeCodeFromIndex($idx, @ranges);
             if (!defined $code) {
                 print('    ');
@@ -150,6 +135,14 @@ sub computeCharCount {
         $count += $range->[1] - $range->[0] + 1;
     }
     return $count;
+}
+
+sub computeIndex {
+    my ($width, $height, $col, $row) = @_;
+    if ($optRowMajor) {
+        return $row * $width + $col;
+    }
+    return $col * $height + $row;
 }
 
 sub computeCodeFromIndex {
