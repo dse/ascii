@@ -167,7 +167,9 @@ sub computeCodeFromIndex {
 sub help { print(<<"END"); }
 usage:
     ascii [-c|--controls] [-C|--controls-only]
+          [-l|--latin-1] [-L|--latin-1-only]
           [-x|--hexadecimal] [-o|--octal] [-d|--decimal]
+          [-r|--row-major-order] [-k|--column-major-order]
           [-a|--alternate]
           [--help]
 END
