@@ -12,6 +12,7 @@ our $optBase = 16;
 our $optLatin1;
 our $optLatin1Only;
 our $optRowMajor = 0;
+our $optAlternate = 0;
 
 Getopt::Long::Configure(qw(gnu_compat bundling no_ignore_case));
 Getopt::Long::GetOptions(
@@ -25,13 +26,97 @@ Getopt::Long::GetOptions(
     'L|latin-1-only'       => \$optLatin1Only,
     'r|row-major-order'    => sub { $optRowMajor = 1; },
     'k|column-major-order' => sub { $optRowMajor = 0; },
+    'a|alternate'          => sub { $optAlternate = 1; $optRowMajor = 1; },
 ) or die("Type 'ascii --help' for help.\n");
 
 our %controls;                 # abbreviations to display for controls
 
-printColumnMajorTable();
+if ($optAlternate) {
+    printAlternateTable();
+} else {
+    printTable();
+}
 
-sub printColumnMajorTable {
+sub printTable {
+    my @ranges = ranges();
+    my $charCount = computeCharCount(@ranges);
+    my $width = 8;
+    my $height = ceil($charCount / $width);
+    for (my $row = 0; $row < $height; $row += 1) {
+        for (my $col = 0; $col < $width; $col += 1) {
+            print(' ') if $col;
+            my $idx;
+            if ($optRowMajor) {
+                $idx = $row * $width + $col;
+            } else {
+                $idx = $col * $height + $row;
+            }
+            my $code = computeCodeFromIndex($idx, @ranges);
+            if (!defined $code) {
+                print('         ');
+                next;
+            }
+            if ($optBase == 16) {
+                printf('0x%02x', $code);
+            } elsif ($optBase == 10) {
+                printf('%4d', $code);
+            } elsif ($optBase == 8) {
+                printf('0%03o', $code);
+            }
+            printf(' %-4s', char($code));
+        }
+        print("\n");
+    }
+}
+
+sub printAlternateTable {
+    my @ranges = ranges();
+    my $charCount = computeCharCount(@ranges);
+    my $width = 16;
+    my $height = ceil($charCount / $width);
+    for (my $row = 0; $row < $height; $row += 1) {
+        for (my $col = 0; $col < $width; $col += 1) {
+            print(' ') if $col;
+            my $idx;
+            if ($optRowMajor) {
+                $idx = $row * $width + $col;
+            } else {
+                $idx = $col * $height + $row;
+            }
+            my $code = computeCodeFromIndex($idx, @ranges);
+            if (!defined $code) {
+                print('    ');
+                next;
+            }
+            if ($optBase == 16) {
+                printf('0x%02x', $code);
+            } elsif ($optBase == 10) {
+                printf('%4d', $code);
+            } elsif ($optBase == 8) {
+                printf('0%03o', $code);
+            }
+        }
+        print("\n");
+        for (my $col = 0; $col < $width; $col += 1) {
+            print(' ') if $col;
+            my $idx;
+            if ($optRowMajor) {
+                $idx = $row * $width + $col;
+            } else {
+                $idx = $col * $height + $row;
+            }
+            my $code = computeCodeFromIndex($idx, @ranges);
+            if (!defined $code) {
+                print('    ');
+                next;
+            }
+            printf('%-4s', char($code));
+        }
+        print("\n");
+    }
+}
+
+sub ranges {
     my @ranges;
     if ($optLatin1Only) {
         @ranges = ([160, 255]);
@@ -55,50 +140,35 @@ sub printColumnMajorTable {
             @ranges = ([0, 127]);
         }
     }
-    my $charCount = 0;
+    return @ranges;
+}
+
+sub computeCharCount {
+    my (@ranges) = @_;
+    my $count = 0;
     foreach my $range (@ranges) {
-        $charCount += $range->[1] - $range->[0] + 1;
+        $count += $range->[1] - $range->[0] + 1;
     }
-    my $width = 8;
-    my $height = ceil($charCount / $width);
-    for (my $row = 0; $row < $height; $row += 1) {
-        for (my $col = 0; $col < $width; $col += 1) {
-            print(' ') if $col;
-            my $idx;
-            if ($optRowMajor) {
-                $idx = $row * $width + $col;
-            } else {
-                $idx = $col * $height + $row;
-            }
-            my $code;
-            foreach my $range (@ranges) {
-                if ($idx <= $range->[1] - $range->[0]) {
-                    $code = $range->[0] + $idx;
-                    last;
-                }
-                $idx -= ($range->[1] - $range->[0] + 1);
-            }
-            if (!defined $code) {
-                print('         ');
-                next;
-            }
-            if ($optBase == 16) {
-                printf('0x%02x', $code);
-            } elsif ($optBase == 10) {
-                printf('%4d', $code);
-            } elsif ($optBase == 8) {
-                printf('0%03o', $code);
-            }
-            printf(' %-4s', char($code));
+    return $count;
+}
+
+sub computeCodeFromIndex {
+    my ($idx, @ranges) = @_;
+    my $code;
+    foreach my $range (@ranges) {
+        if ($idx <= $range->[1] - $range->[0]) {
+            return $range->[0] + $idx;
         }
-        print("\n");
+        $idx -= ($range->[1] - $range->[0] + 1);
     }
+    return;
 }
 
 sub help { print(<<"END"); }
 usage:
     ascii [-c|--controls] [-C|--controls-only]
           [-x|--hexadecimal] [-o|--octal] [-d|--decimal]
+          [-a|--alternate]
           [--help]
 END
 
