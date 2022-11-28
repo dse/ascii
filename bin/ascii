@@ -4,6 +4,21 @@ use strict;
 use open qw(locale);
 
 use POSIX qw(ceil);
+use Getopt::Long;
+
+our $optControls;
+our $optControlsOnly;
+our $optBase = 16;
+
+Getopt::Long::Configure(qw(gnu_compat bundling no_ignore_case));
+Getopt::Long::GetOptions(
+    'help' => sub { help(); exit(0); },
+    'c|controls'      => \$optControls,
+    'C|controls-only' => \$optControlsOnly,
+    'o|octal'         => sub { $optBase = 8; },
+    'd|decimal'       => sub { $optBase = 10; },
+    'x|hexadecimal'   => sub { $optBase = 16; },
+) or die("Type 'ascii --help' for help.\n");
 
 our %controls;                 # abbreviations to display for controls
 
@@ -12,20 +27,72 @@ printColumnMajorTable();
 sub printColumnMajorTable {
     my $from = 32;
     my $to = 127;
+    if ($optControls) {
+        $from = 0;
+    } elsif ($optControlsOnly) {
+        $from = 0;
+        $to = 31;
+    }
     my $width = 8;
     my $height = ceil(($to - $from + 1) / $width);
     for (my $row = 0; $row < $height; $row += 1) {
         for (my $col = 0; $col < $width; $col += 1) {
             print('  ') if $col;
             my $code = $from + $col * $height + $row;
-            printf('0x%02x %-3s', $code, $controls{$code} // chr($code));
+            if ($optBase == 16) {
+                printf('0x%02x', $code);
+            } elsif ($optBase == 10) {
+                printf('%4d', $code);
+            } elsif ($optBase == 8) {
+                printf('0%03o', $code);
+            }
+            printf(' %-3s', $controls{$code} // chr($code));
         }
         print("\n");
     }
 }
 
+sub help { print(<<"END"); }
+usage:
+    ascii [-c|--controls] [-C|--controls-only]
+          [-x|--hexadecimal] [-o|--octal] [-d|--decimal]
+          [--help]
+END
+
 BEGIN {
     %controls = (
+        0x00 => 'NUL',
+        0x01 => 'SOH',
+        0x02 => 'STX',
+        0x03 => 'ETX',
+        0x04 => 'EOT',
+        0x05 => 'ENQ',
+        0x06 => 'ACK',
+        0x07 => 'BEL',
+        0x08 => 'BS',
+        0x09 => 'HT',
+        0x0a => 'LF',
+        0x0b => 'VT',
+        0x0c => 'FF',
+        0x0d => 'CR',
+        0x0e => 'SO',           # or LS1
+        0x0f => 'SI',           # or LS0
+        0x10 => 'DLE',
+        0x11 => 'DC1',
+        0x12 => 'DC2',
+        0x13 => 'DC3',
+        0x14 => 'DC4',
+        0x15 => 'NAK',
+        0x16 => 'SYN',
+        0x17 => 'ETB',
+        0x18 => 'CAN',
+        0x19 => 'EM',
+        0x1a => 'SUB',
+        0x1b => 'ESC',
+        0x1c => 'IS4',
+        0x1d => 'IS3',
+        0x1e => 'IS2',
+        0x1f => 'IS1',
         0x20 => 'SP',
         0x7f => 'DEL',
     );
