@@ -9,6 +9,8 @@ use Getopt::Long;
 our $optControls;
 our $optControlsOnly;
 our $optBase = 16;
+our $optLatin1;
+our $optLatin1Only;
 
 Getopt::Long::Configure(qw(gnu_compat bundling no_ignore_case));
 Getopt::Long::GetOptions(
@@ -18,6 +20,8 @@ Getopt::Long::GetOptions(
     'o|octal'         => sub { $optBase = 8; },
     'd|decimal'       => sub { $optBase = 10; },
     'x|hexadecimal'   => sub { $optBase = 16; },
+    'l|latin-1'       => \$optLatin1,
+    'L|latin-1-only'  => \$optLatin1Only,
 ) or die("Type 'ascii --help' for help.\n");
 
 our %controls;                 # abbreviations to display for controls
@@ -25,20 +29,51 @@ our %controls;                 # abbreviations to display for controls
 printColumnMajorTable();
 
 sub printColumnMajorTable {
-    my $from = 32;
-    my $to = 127;
-    if ($optControls) {
-        $from = 0;
-    } elsif ($optControlsOnly) {
-        $from = 0;
-        $to = 31;
+    my @ranges;
+    if ($optLatin1Only) {
+        @ranges = ([160, 255]);
+        if ($optControlsOnly) {
+            @ranges = ([128, 159]);
+        } elsif ($optControls) {
+            @ranges = ([128, 255]);
+        }
+    } elsif ($optLatin1) {
+        @ranges = ([32, 127], [160, 255]);
+        if ($optControlsOnly) {
+            @ranges = ([0, 31], [128, 159]);
+        } elsif ($optControls) {
+            @ranges = ([0, 255]);
+        }
+    } else {
+        @ranges = ([32, 127]);
+        if ($optControlsOnly) {
+            @ranges = ([0, 31]);
+        } elsif ($optControls) {
+            @ranges = ([0, 127]);
+        }
+    }
+    my $charCount = 0;
+    foreach my $range (@ranges) {
+        $charCount += $range->[1] - $range->[0] + 1;
     }
     my $width = 8;
-    my $height = ceil(($to - $from + 1) / $width);
+    my $height = ceil($charCount / $width);
     for (my $row = 0; $row < $height; $row += 1) {
         for (my $col = 0; $col < $width; $col += 1) {
-            print('  ') if $col;
-            my $code = $from + $col * $height + $row;
+            print(' ') if $col;
+            my $idx = $col * $height + $row;
+            my $code;
+            foreach my $range (@ranges) {
+                if ($idx <= $range->[1] - $range->[0]) {
+                    $code = $range->[0] + $idx;
+                    last;
+                }
+                $idx -= ($range->[1] - $range->[0] + 1);
+            }
+            if (!defined $code) {
+                print('         ');
+                next;
+            }
             if ($optBase == 16) {
                 printf('0x%02x', $code);
             } elsif ($optBase == 10) {
@@ -46,7 +81,7 @@ sub printColumnMajorTable {
             } elsif ($optBase == 8) {
                 printf('0%03o', $code);
             }
-            printf(' %-3s', char($code));
+            printf(' %-4s', char($code));
         }
         print("\n");
     }
@@ -103,5 +138,38 @@ BEGIN {
         0x1f => { abbr => 'IS1' },
         0x20 => { abbr => 'SP' },
         0x7f => { abbr => 'DEL' },
+        0x80 => { abbr => '--' },
+        0x81 => { abbr => '--' },
+        0x82 => { abbr => 'BPH' },
+        0x83 => { abbr => 'NBH' },
+        0x84 => { abbr => '--' },
+        0x85 => { abbr => 'NEL' },
+        0x86 => { abbr => 'SSA' },
+        0x87 => { abbr => 'ESA' },
+        0x88 => { abbr => 'HTS' },
+        0x89 => { abbr => 'HTJ' },
+        0x8a => { abbr => 'VTS' },
+        0x8b => { abbr => 'PLD' },
+        0x8c => { abbr => 'PLU' },
+        0x8d => { abbr => 'RI' },
+        0x8e => { abbr => 'SS2' },
+        0x8f => { abbr => 'SS3' },
+        0x90 => { abbr => 'DCS' },
+        0x91 => { abbr => 'PU1' },
+        0x92 => { abbr => 'PU2' },
+        0x93 => { abbr => 'STS' },
+        0x94 => { abbr => 'CCH' },
+        0x95 => { abbr => 'MW' },
+        0x96 => { abbr => 'SPA' },
+        0x97 => { abbr => 'EPA' },
+        0x98 => { abbr => 'SOS' },
+        0x99 => { abbr => '--' },
+        0x9a => { abbr => 'SCI' },
+        0x9b => { abbr => 'CSI' },
+        0x9c => { abbr => 'ST' },
+        0x9d => { abbr => 'OSC' },
+        0x9e => { abbr => 'PM' },
+        0x9f => { abbr => 'APC' },
+        0xa0 => { abbr => 'NBSP' },
     );
 }
