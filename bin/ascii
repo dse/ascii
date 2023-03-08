@@ -6,6 +6,8 @@ use open qw(:locale);
 use POSIX qw(ceil);
 use Getopt::Long;
 
+our $termColumnCount = 79;
+
 our $optControls;
 our $optControlsOnly;
 our $optBase = 16;
@@ -13,6 +15,7 @@ our $optLatin1;
 our $optLatin1Only;
 our $optRowMajor = 0;
 our $optAlternate = 0;
+our $optShort = 0;
 
 Getopt::Long::Configure(qw(gnu_compat bundling no_ignore_case));
 Getopt::Long::GetOptions(
@@ -27,14 +30,37 @@ Getopt::Long::GetOptions(
     'r|row-major-order'    => sub { $optRowMajor = 1; },
     'k|column-major-order' => sub { $optRowMajor = 0; },
     'a|alternate'          => sub { $optAlternate = 1; $optRowMajor = 1; },
+    's|short'              => \$optShort,
 ) or die("Type 'ascii --help' for help.\n");
 
 our %controls;                 # abbreviations to display for controls
 
-if ($optAlternate) {
+if ($optShort) {
+    printShort();
+} elsif ($optAlternate) {
     printAlternateTable();
 } else {
     printTable();
+}
+
+sub printShort {
+    my @ranges = ranges();
+    my $termColumnCount = $termColumnCount - 16;
+    foreach my $range (@ranges) {
+        my $low = $range->[0] & ~15;
+        my $high = $range->[1] | 15;
+        my $charCount = $high - $low + 1;
+        my $rowCount = ceil($charCount / $termColumnCount);
+        my $columnCount = ceil($charCount / $rowCount);
+        for (my $row = 0; $row < $rowCount; $row += 1) {
+            my $rowLow = $low + $columnCount * $row;
+            my $rowHigh = $rowLow + $columnCount - 1;
+            printf("%6x  ", $rowLow);
+            print(join("", map { char($_, 1) } ($rowLow .. $rowHigh)));
+            printf("  %6x", $rowHigh);
+            print("\n");
+        }
+    }
 }
 
 sub printTable {
@@ -168,11 +194,23 @@ usage:
 END
 
 sub char {
-    my ($code) = @_;
+    my ($code, $maxLen) = @_;
+    return ' ' if $code == 127 && defined $maxLen && $maxLen == 1;
     my $ctrl = $controls{$code};
-    return chr($code) if !defined $ctrl;
+    if (!defined $ctrl) {
+        return chr($code);
+    }
     my $abbr = $ctrl->{abbr};
-    return $abbr // chr($code);
+    if (defined $abbr) {
+        if (!defined $maxLen) {
+            return $abbr;
+        }
+        if (length($abbr) <= $maxLen) {
+            return $abbr;
+        }
+        return ' ';
+    }
+    return chr($code);
 }
 
 BEGIN {
