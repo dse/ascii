@@ -13,6 +13,8 @@ our $optControlsOnly;
 our $optBase = 16;
 our $optLatin1;
 our $optLatin1Only;
+our $optCyrillic;
+our $optCyrillicOnly;
 our $optRowMajor = 0;
 our $optAlternate = 0;
 our $optShort = 0;
@@ -27,6 +29,8 @@ Getopt::Long::GetOptions(
     'x|hexadecimal'        => sub { $optBase = 16; },
     'l|latin-1'            => \$optLatin1,
     'L|latin-1-only'       => \$optLatin1Only,
+    'latin-5|cyrillic'           => \$optCyrillic,
+    'latin-5-only|cyrillic-only' => \$optCyrillicOnly,
     'r|row-major-order'    => sub { $optRowMajor = 1; },
     'k|column-major-order' => sub { $optRowMajor = 0; },
     'a|alternate'          => sub { $optAlternate = 1; $optRowMajor = 1; },
@@ -129,27 +133,24 @@ sub printAlternateTable {
 
 sub ranges {
     my @ranges;
-    if ($optLatin1Only) {
-        @ranges = ([160, 255]);
-        if ($optControlsOnly) {
-            @ranges = ([128, 159]);
-        } elsif ($optControls) {
-            @ranges = ([128, 255]);
+    if ($optControlsOnly || $optControls) {
+        if (!$optLatin1Only && !$optCyrillicOnly) {
+            push(@ranges, [0, 31]);
         }
-    } elsif ($optLatin1) {
-        @ranges = ([32, 127], [160, 255]);
-        if ($optControlsOnly) {
-            @ranges = ([0, 31], [128, 159]);
-        } elsif ($optControls) {
-            @ranges = ([0, 255]);
+    }
+    if (!$optLatin1Only && !$optCyrillicOnly && !$optControlsOnly) {
+        push(@ranges, [32, 127]);
+    }
+    if ($optLatin1Only || $optLatin1) {
+        if ($optControlsOnly || $optControls) {
+            push(@ranges, [128, 159]);
         }
-    } else {
-        @ranges = ([32, 127]);
-        if ($optControlsOnly) {
-            @ranges = ([0, 31]);
-        } elsif ($optControls) {
-            @ranges = ([0, 127]);
+        if (!$optControlsOnly) {
+            push(@ranges, [160, 255]);
         }
+    }
+    if ($optCyrillicOnly || $optCyrillic) {
+        push(@ranges, [0x0400, 0x045f]);
     }
     return @ranges;
 }
