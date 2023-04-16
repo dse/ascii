@@ -5,6 +5,9 @@ use open qw(:locale);
 use POSIX qw(ceil);
 use Getopt::Long;
 use Term::ReadKey qw(GetTerminalSize);
+use Unicode::UCD qw(prop_invmap charprop);
+use JSON qw();
+use Time::HiRes qw(gettimeofday);
 
 our $termColumnCount = GetTerminalSize() // 80;
 
@@ -34,8 +37,6 @@ Getopt::Long::GetOptions(
     'a|alternate'          => sub { $optAlternate = 1; $optRowMajor = 1; },
     's|short'              => \$optShort,
 ) or die("Type 'ascii --help' for help.\n");
-
-our %controls;                 # abbreviations to display for controls
 
 if ($optShort) {
     printShort();
@@ -191,24 +192,53 @@ END
 
 sub char {
     my ($code, $maxLen) = @_;
-    return ' ' if $code == 127 && defined $maxLen && $maxLen == 1;
-    my $ctrl = $controls{$code};
-    if (!defined $ctrl) {
-        return chr($code);
-    }
-    my $abbr = $ctrl->{abbr};
-    if (defined $abbr) {
-        if (!defined $maxLen) {
-            return $abbr;
-        }
-        if (length($abbr) <= $maxLen) {
-            return $abbr;
-        }
+    if (isSpace($code) || isControl($code)) {
+        my @abbrs = getAbbreviations($code);
+        my $abbr = $abbrs[0];
+        return $abbr if defined $abbr && ((!defined $maxLen) || length($abbr) <= $maxLen);
         return ' ';
     }
     return chr($code);
 }
 
+our %abbrevs;
+our %gc;
+INIT {
+    my ($na_list, $na_map) = prop_invmap("Name_Alias");
+    @abbrevs{@$na_list} = @$na_map;
+    my ($gc_list, $gc_map) = prop_invmap("General_Category");
+    @gc{@$gc_list} = @$gc_map;
+}
+
+sub getAbbreviations {
+    my ($codepoint) = @_;
+    my $abbrevs = $abbrevs{$codepoint};
+    return wantarray ? () : [] if !defined $abbrevs;
+    my @abbrevs = ref $abbrevs eq 'ARRAY' ? @$abbrevs : ($abbrevs);
+    @abbrevs = grep { /: abbreviation$/ } @abbrevs;
+    s/: abbreviation$// foreach @abbrevs;
+    return wantarray ? @abbrevs : \@abbrevs;
+}
+
+sub isControl {
+    my ($codepoint) = @_;
+    my $gc = $gc{$codepoint} // charprop($codepoint, 'General_Category');
+    # printf STDERR ("CONTROL? %d %s\n", $codepoint, $gc // '(undef)') if $codepoint >= 32 && $codepoint <= 126;
+    return 1 if !defined $gc;
+    return 1 if ($gc eq 'Control' || $gc eq 'Cc');
+    return;
+}
+
+sub isSpace {
+    my ($codepoint) = @_;
+    my $gc = $gc{$codepoint} // charprop($codepoint, 'General_Category');
+    # printf STDERR ("CONTROL? %d %s\n", $codepoint, $gc // '(undef)') if $codepoint >= 32 && $codepoint <= 126;
+    return 1 if !defined $gc;
+    return 1 if ($gc eq 'Space_Separator' || $gc eq 'Zs');
+    return;
+}
+
+our %controls;
 BEGIN {
     # https://en.wikipedia.org/wiki/Unicode_alias_names_and_abbreviations
     %controls = (
@@ -221,8 +251,8 @@ BEGIN {
         0x06 => { abbr => 'ACK' },
         0x07 => { abbr => 'BEL' },
         0x08 => { abbr => 'BS' },
-        0x09 => { abbr => 'HT' },
-        0x0a => { abbr => 'LF' },
+        0x09 => { abbr => ['TAB', 'HT'] },
+        0x0a => { abbr => ['LF', 'NL', 'EOL'] },
         0x0b => { abbr => 'VT' },
         0x0c => { abbr => 'FF' },
         0x0d => { abbr => 'CR' },
