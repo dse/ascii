@@ -7,7 +7,6 @@ use POSIX qw(floor ceil);
 use Getopt::Long;
 use Unicode::UCD qw(charinfo);
 use Text::Wrap qw(wrap);
-use POSIX qw(dup dup2);
 
 our $ascii      = 1;
 our $latin_1    = 0;
@@ -191,16 +190,16 @@ sub disp_char {
 
 INIT {
     # Silence a warning when not running in a TTY, part 1.
-    my $stderr_fd = fileno(\*STDERR);
-    my $fd = dup($stderr_fd);
+    local *SAVE_STDERR;
+    open(\*SAVE_STDERR, ">&2");
     close(\*STDERR);
 
     $TERM_WIDTH = GetTerminalSize();
 
     # Silence a warning when not running in a TTY, part 2, restore
     # stderr.
-    open(\*STDERR, ">&$stderr_fd");
-    close($fd);
+    open(\*STDERR, ">&" . fileno(\*SAVE_STDERR));
+    close(\*SAVE_STDERR);
 }
 
 BEGIN {
