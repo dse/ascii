@@ -7,6 +7,7 @@ use POSIX qw(floor ceil);
 use Getopt::Long;
 use Unicode::UCD qw(charinfo);
 use Text::Wrap qw(wrap);
+use POSIX qw(dup dup2);
 
 our $ascii   = 1;
 our $latin_1 = 0;
@@ -115,8 +116,8 @@ sub ascii_table_3 {
         undef $name      if defined $name      && $name      !~ /\S/;
         undef $unicode10 if defined $unicode10 && $unicode10 !~ /\S/;
 
-        # if name is "X WITH Y" and unicode 1.0 name is "X Y" then
-        # only display the "X WITH Y" name.
+        # Delete certain Unicode 1.0 names if they're too similar (as
+        # deemed by yours truly) to the current Unicode names.
         if (defined $unicode10 && defined $name) {
             my $unicode10_2 = $name;
             $unicode10_2 =~ s/ WITH / /g;
@@ -180,7 +181,17 @@ sub disp_char {
 }
 
 INIT {
+    # Silence a warning when not running in a TTY, part 1.
+    my $stderr_fd = fileno(\*STDERR);
+    my $fd = dup($stderr_fd);
+    close(\*STDERR);
+
     $TERM_WIDTH = GetTerminalSize();
+
+    # Silence a warning when not running in a TTY, part 2, restore
+    # stderr.
+    dup2($fd, $stderr_fd);
+    close($fd);
 }
 
 BEGIN {
