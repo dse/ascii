@@ -1,348 +1,256 @@
 #!/usr/bin/env perl
 use warnings;
 use strict;
-use open qw(:locale);
-use POSIX qw(ceil);
-use Getopt::Long;
+use open IO => qw(:locale);
 use Term::ReadKey qw(GetTerminalSize);
-use Unicode::UCD qw(prop_invmap charprop);
-use JSON qw();
-use Time::HiRes qw(gettimeofday);
+use POSIX qw(floor ceil);
+use Getopt::Long;
+use Unicode::UCD qw(charinfo);
+use Text::Wrap qw(wrap);
 
-our $termColumnCount = GetTerminalSize() // 80;
+our $ascii   = 1;
+our $latin_1 = 0;
+our $base    = 16;
+our $table_type = 1;
+our $row_major = 0;
 
-our $optControls;
-our $optBase = 16;
-our $optLatin1;
-our $optLatin1Only;
-our $optCyrillic;
-our $optCyrillicOnly;
-our $optRowMajor = 0;
-our $optAlternate = 0;
-our $optShort = 0;
+Getopt::Long::Configure(qw(gnu_getopt));
+Getopt::Long::GetOptions("l|latin-1"           => \$latin_1,
+                         "L|latin-1-only"      => sub { $latin_1 = 1; $ascii = 0; },
+                         "A|no-ascii"          => sub { $ascii = 0; },
+                         "h|hex|hexadecimal"   => sub { $base = 16; },
+                         "d|dec|decimal"       => sub { $base = 10; },
+                         "o|oct|octal"         => sub { $base = 8; },
+                         "t|table-type|type=i" => \$table_type,
+                         "r|row-major"         => \$row_major,
+                         "1"                   => sub { $table_type = 1; },
+                         "2"                   => sub { $table_type = 2; },
+                         "3"                   => sub { $table_type = 3; },
+) or die(":-(");
 
-Getopt::Long::Configure(qw(gnu_compat bundling no_ignore_case));
-Getopt::Long::GetOptions(
-    'help' => sub { help(); exit(0); },
-    'c|controls'           => \$optControls,
-    'o|octal'              => sub { $optBase = 8; },
-    'd|decimal'            => sub { $optBase = 10; },
-    'x|hexadecimal'        => sub { $optBase = 16; },
-    'l|latin-1'            => \$optLatin1,
-    'L|latin-1-only'       => \$optLatin1Only,
-    'latin-5|cyrillic'           => \$optCyrillic,
-    'latin-5-only|cyrillic-only' => \$optCyrillicOnly,
-    'r|row-major-order'    => sub { $optRowMajor = 1; },
-    'k|column-major-order' => sub { $optRowMajor = 0; },
-    'a|alternate'          => sub { $optAlternate = 1; $optRowMajor = 1; },
-    's|short'              => \$optShort,
-) or die("Type 'ascii --help' for help.\n");
-
-if ($optShort) {
-    printShort();
-} elsif ($optAlternate) {
-    printAlternateTable();
-} else {
-    printTable();
+if (($table_type <= 1 || $table_type == 3) && $row_major) {
+    die("ascii: --row-major does not make sense with table type $table_type\n");
 }
 
-sub printShort {
-    my @ranges = ranges();
-    my $termColumnCount = $termColumnCount - 16;
-    foreach my $range (@ranges) {
-        my $low = $range->[0] & ~15;
-        my $high = $range->[1] | 15;
-        my $charCount = $high - $low + 1;
-        my $rowCount = ceil($charCount / $termColumnCount);
-        my $columnCount = ceil($charCount / $rowCount);
-        for (my $row = 0; $row < $rowCount; $row += 1) {
-            my $rowLow = $low + $columnCount * $row;
-            my $rowHigh = $rowLow + $columnCount - 1;
-            printf("%6x  ", $rowLow);
-            print(join("", map { char($_, 1) } ($rowLow .. $rowHigh)));
-            printf("  %6x", $rowHigh);
-            print("\n");
-        }
+if (!$ascii && !$latin_1) {
+    $latin_1 = 1;
+}
+
+our $TERM_WIDTH;
+our %CHAR_INFO_2;
+
+our ($start_at, $end_at) = (0, 127);
+if ($latin_1) {
+    if ($ascii) {
+        ($start_at, $end_at) = (0, 255);
+    } else {
+        ($start_at, $end_at) = (128, 255);
     }
 }
 
-sub printTable {
-    my @ranges = ranges();
-    my $charCount = computeCharCount(@ranges);
-    my $width = 8;
-    my $height = ceil($charCount / $width);
-    for (my $row = 0; $row < $height; $row += 1) {
-        for (my $col = 0; $col < $width; $col += 1) {
-            print(' ') if $col;
-            my $idx = computeIndex($width, $height, $col, $row);
-            my $code = computeCodeFromIndex($idx, @ranges);
-            if (!defined $code) {
-                print('         ');
-                next;
-            }
-            if ($optBase == 16) {
-                printf('0x%02x', $code);
-            } elsif ($optBase == 10) {
-                printf('%4d', $code);
-            } elsif ($optBase == 8) {
-                printf('0%03o', $code);
-            }
-            printf(' %-4s', char($code));
+if ($table_type <= 1) {
+    ascii_table_1();
+} elsif ($table_type == 2) {
+    ascii_table_2();
+} elsif ($table_type >= 3) {
+    ascii_table_3();
+}
+
+
+sub ascii_table_1 {
+    print(" " x 4);
+    for (my $col = 0; $col < 16; $col += 1) {
+        printf("   %1X", $col);
+    }
+    print("\n");
+    print(" " x 5, " ---" x 16, "\n");
+    for (my $row = floor($start_at / 16); $row <= floor($end_at / 16); $row += 1) {
+        printf("0x%1X |", $row);
+        for (my $col = 0; $col < 16; $col += 1) {
+            my $codepoint = $row * 16 + $col;
+            print(disp_char($codepoint));
         }
         print("\n");
     }
 }
 
-sub printAlternateTable {
-    my @ranges = ranges();
-    my $charCount = computeCharCount(@ranges);
-    my $width = 16;
-    my $height = ceil($charCount / $width);
-    for (my $row = 0; $row < $height; $row += 1) {
-        for (my $col = 0; $col < $width; $col += 1) {
-            print(' ') if $col;
-            my $idx = computeIndex($width, $height, $col, $row);
-            my $code = computeCodeFromIndex($idx, @ranges);
-            if (!defined $code) {
-                print('    ');
-                next;
+sub ascii_table_2 {
+    print(join("  ", ("--------") x 8) . "\n");
+    my $row_count = floor((1 + $end_at - $start_at) / 8);
+    my $column_count = ceil(($end_at - $start_at + 1) / $row_count);
+    for (my $row = 0; $row < $row_count; $row += 1) {
+        for (my $col = 0; $col < 8; $col += 1) {
+            if ($col) {
+                print(" ");
             }
-            if ($optBase == 16) {
-                printf('0x%02x', $code);
-            } elsif ($optBase == 10) {
-                printf('%4d', $code);
-            } elsif ($optBase == 8) {
-                printf('0%03o', $code);
+            my $codepoint = $start_at + $col * $row_count + $row;
+            if ($row_major) {
+                $codepoint = $start_at + $col + $row * $column_count;
             }
-        }
-        print("\n");
-        for (my $col = 0; $col < $width; $col += 1) {
-            print(' ') if $col;
-            my $idx = computeIndex($width, $height, $col, $row);
-            my $code = computeCodeFromIndex($idx, @ranges);
-            if (!defined $code) {
-                print('    ');
-                next;
+            if ($base == 16) {
+                printf("0x%02X%s", $codepoint, disp_char($codepoint));
+            } elsif ($base == 10) {
+                printf("%4d%s", $codepoint, disp_char($codepoint));
+            } elsif ($base == 8) {
+                printf("0%03o%s", $codepoint, disp_char($codepoint));
             }
-            printf('%-4s', char($code));
         }
         print("\n");
     }
 }
 
-sub ranges {
-    my @ranges;
-    if ($optControls) {
-        if (!$optLatin1Only && !$optCyrillicOnly) {
-            push(@ranges, [0, 31]);
+sub ascii_table_3 {
+    print("Codepoint   Char  Name (Unicode 1.0) [Alternate]\n");
+    print("----------  ----  --------------------------------------------------------------\n");
+    for (my $codepoint = $start_at; $codepoint <= $end_at; $codepoint += 1) {
+        my $u = sprintf("U+%04X", $codepoint);
+        if ($base == 10) {
+            $u = sprintf("%6d", $codepoint);
+        } elsif ($base == 8) {
+            $u = sprintf("0%02o", $codepoint);
         }
-    }
-    if (!$optLatin1Only && !$optCyrillicOnly) {
-        push(@ranges, [32, 127]);
-    }
-    if ($optLatin1Only || $optLatin1) {
-        if ($optControls) {
-            push(@ranges, [128, 159]);
+        my $charinfo = charinfo($codepoint);
+        my $name      = $charinfo->{name};
+        my $unicode10 = $charinfo->{unicode10};
+        undef $name      if defined $name      && $name      !~ /\S/;
+        undef $unicode10 if defined $unicode10 && $unicode10 !~ /\S/;
+
+        # if name is "X WITH Y" and unicode 1.0 name is "X Y" then
+        # only display the "X WITH Y" name.
+        if (defined $unicode10 && defined $name) {
+            my $unicode10_2 = $name;
+            $unicode10_2 =~ s/ WITH / /g;
+            if ($unicode10_2 eq $unicode10) {
+                $unicode10 = undef;
+            }
         }
-    }
-    if ($optCyrillicOnly || $optCyrillic) {
-        push(@ranges, [0x0400, 0x045f]);
-    }
-    return @ranges;
-}
 
-sub computeCharCount {
-    my (@ranges) = @_;
-    my $count = 0;
-    foreach my $range (@ranges) {
-        $count += $range->[1] - $range->[0] + 1;
-    }
-    return $count;
-}
-
-sub computeIndex {
-    my ($width, $height, $col, $row) = @_;
-    if ($optRowMajor) {
-        return $row * $width + $col;
-    }
-    return $col * $height + $row;
-}
-
-sub computeCodeFromIndex {
-    my ($idx, @ranges) = @_;
-    my $code;
-    foreach my $range (@ranges) {
-        if ($idx <= $range->[1] - $range->[0]) {
-            return $range->[0] + $idx;
+        my @names;
+        my $char_info_2 = $CHAR_INFO_2{$codepoint};
+        my $alt_name = defined $char_info_2 ? $char_info_2->{alt_name} : undef;
+        if (ref($alt_name) eq 'ARRAY') {
+            $alt_name = join(', ', @$alt_name);
         }
-        $idx -= ($range->[1] - $range->[0] + 1);
+
+        if (defined $name) {
+            push(@names, $name);
+        }
+        if (defined $unicode10 && $unicode10 =~ /\S/) {
+            push(@names, sprintf("(%s)", $unicode10));
+        }
+        if (defined $alt_name) {
+            push(@names, sprintf("[%s]", $alt_name));
+        }
+
+        # While we wrap text, we don't break each of the displayed
+        # character names.  We replace the # with spaces later.
+        s/ /#/g foreach @names;
+
+        my $disp_name = join(" ", grep { defined $_ && /\S/ } @names);
+        my $line = sprintf("%10s  %-4.4s  %s", $u, disp_char($codepoint), $disp_name);
+        $line = wrap('', ' ' x 18, $line);
+        $line =~ s/#/ /g;
+        print("$line\n");
     }
-    return;
 }
 
-sub help { print(<<"END"); }
-usage:
-    ascii [-c|--controls]
-          [-l|--latin-1] [-L|--latin-1-only]
-          [-x|--hexadecimal] [-o|--octal] [-d|--decimal]
-          [-r|--row-major-order] [-k|--column-major-order]
-          [-a|--alternate]
-          [--help]
-END
-
-sub char {
-    my ($code, $maxLen) = @_;
-    if (isSpace($code) || isControl($code)) {
-        my @abbrs = getAbbreviations($code);
-        my $abbr = $abbrs[0];
-        return $abbr if defined $abbr && ((!defined $maxLen) || length($abbr) <= $maxLen);
-        return ' ';
+sub disp_char {
+    my ($codepoint) = @_;
+    my $char_info_2 = $CHAR_INFO_2{$codepoint};
+    my $is_control = defined $char_info_2 ? $char_info_2->{control} : undef;
+    my $is_graph   = defined $char_info_2 ? $char_info_2->{graph}   : 1; # all controls listed in %CHAR_INFO_2
+    my $abbr       = defined $char_info_2 ? $char_info_2->{abbr}    : undef;
+    my $esc        = defined $char_info_2 ? $char_info_2->{esc}     : undef;
+    if ($table_type <= 1) {
+        return sprintf("  %c ", $codepoint) if $is_graph;
+        return sprintf("%-4.4s", $abbr) if defined $abbr && length($abbr) >= 4;
+        return sprintf(" %-3.3s", $abbr) if defined $abbr;
+        return " ---";
+    } elsif ($table_type == 2) {
+        return sprintf(" %c   ", $codepoint) if $is_graph;
+        return sprintf(" %-4.4s", $abbr) if defined $abbr && length($abbr) >= 4;
+        return sprintf(" %-3.3s ", $abbr) if defined $abbr;
+        return " --- ";
+    } elsif ($table_type >= 3) {
+        return sprintf(" %c  ", $codepoint) if $is_graph;
+        return sprintf("%-4.4s", $abbr) if defined $abbr && length($abbr) >= 4;
+        return sprintf("%-3.3s ", $abbr) if defined $abbr;
+        return "--- ";
     }
-    return chr($code);
 }
 
-our %abbrevs;
-our %gc;
 INIT {
-    my ($na_list, $na_map) = prop_invmap("Name_Alias");
-    @abbrevs{@$na_list} = @$na_map;
-    my ($gc_list, $gc_map) = prop_invmap("General_Category");
-    @gc{@$gc_list} = @$gc_map;
+    $TERM_WIDTH = GetTerminalSize();
 }
 
-sub getAbbreviations {
-    my ($codepoint) = @_;
-    my $abbrevs = $abbrevs{$codepoint};
-    return wantarray ? () : [] if !defined $abbrevs;
-    my @abbrevs = ref $abbrevs eq 'ARRAY' ? @$abbrevs : ($abbrevs);
-    @abbrevs = grep { /: abbreviation$/ } @abbrevs;
-    s/: abbreviation$// foreach @abbrevs;
-    return wantarray ? @abbrevs : \@abbrevs;
-}
-
-sub isControl {
-    my ($codepoint) = @_;
-    my $gc = $gc{$codepoint} // charprop($codepoint, 'General_Category');
-    # printf STDERR ("CONTROL? %d %s\n", $codepoint, $gc // '(undef)') if $codepoint >= 32 && $codepoint <= 126;
-    return 1 if !defined $gc;
-    return 1 if ($gc eq 'Control' || $gc eq 'Cc');
-    return;
-}
-
-sub isSpace {
-    my ($codepoint) = @_;
-    my $gc = $gc{$codepoint} // charprop($codepoint, 'General_Category');
-    # printf STDERR ("CONTROL? %d %s\n", $codepoint, $gc // '(undef)') if $codepoint >= 32 && $codepoint <= 126;
-    return 1 if !defined $gc;
-    return 1 if ($gc eq 'Space_Separator' || $gc eq 'Zs');
-    return;
-}
-
-our %controls;
 BEGIN {
-    # https://en.wikipedia.org/wiki/Unicode_alias_names_and_abbreviations
-    %controls = (
-        0x00 => { abbr => 'NUL' },
-        0x01 => { abbr => 'SOH' },
-        0x02 => { abbr => 'STX' },
-        0x03 => { abbr => 'ETX' },
-        0x04 => { abbr => 'EOT' },
-        0x05 => { abbr => 'ENQ' },
-        0x06 => { abbr => 'ACK' },
-        0x07 => { abbr => 'BEL' },
-        0x08 => { abbr => 'BS' },
-        0x09 => { abbr => ['TAB', 'HT'] },
-        0x0a => { abbr => ['LF', 'NL', 'EOL'] },
-        0x0b => { abbr => 'VT' },
-        0x0c => { abbr => 'FF' },
-        0x0d => { abbr => 'CR' },
-        0x0e => { abbr => 'SO' }, # or LS1
-        0x0f => { abbr => 'SI' }, # or LS0
-        0x10 => { abbr => 'DLE' },
-        0x11 => { abbr => 'DC1' },
-        0x12 => { abbr => 'DC2' },
-        0x13 => { abbr => 'DC3' },
-        0x14 => { abbr => 'DC4' },
-        0x15 => { abbr => 'NAK' },
-        0x16 => { abbr => 'SYN' },
-        0x17 => { abbr => 'ETB' },
-        0x18 => { abbr => 'CAN' },
-        0x19 => { abbr => 'EM' },
-        0x1a => { abbr => 'SUB' },
-        0x1b => { abbr => 'ESC' },
-        0x1c => { abbr => 'IS4' },
-        0x1d => { abbr => 'IS3' },
-        0x1e => { abbr => 'IS2' },
-        0x1f => { abbr => 'IS1' },
-        0x20 => { abbr => 'SP' },
-        0x7f => { abbr => 'DEL' },
-        0x80 => { abbr => '--' },
-        0x81 => { abbr => '--' },
-        0x82 => { abbr => 'BPH' },
-        0x83 => { abbr => 'NBH' },
-        0x84 => { abbr => '--' },
-        0x85 => { abbr => 'NEL' },
-        0x86 => { abbr => 'SSA' },
-        0x87 => { abbr => 'ESA' },
-        0x88 => { abbr => 'HTS' },
-        0x89 => { abbr => 'HTJ' },
-        0x8a => { abbr => 'VTS' },
-        0x8b => { abbr => 'PLD' },
-        0x8c => { abbr => 'PLU' },
-        0x8d => { abbr => 'RI' },
-        0x8e => { abbr => 'SS2' },
-        0x8f => { abbr => 'SS3' },
-        0x90 => { abbr => 'DCS' },
-        0x91 => { abbr => 'PU1' },
-        0x92 => { abbr => 'PU2' },
-        0x93 => { abbr => 'STS' },
-        0x94 => { abbr => 'CCH' },
-        0x95 => { abbr => 'MW' },
-        0x96 => { abbr => 'SPA' },
-        0x97 => { abbr => 'EPA' },
-        0x98 => { abbr => 'SOS' },
-        0x99 => { abbr => '--' },
-        0x9a => { abbr => 'SCI' },
-        0x9b => { abbr => 'CSI' },
-        0x9c => { abbr => 'ST' },
-        0x9d => { abbr => 'OSC' },
-        0x9e => { abbr => 'PM' },
-        0x9f => { abbr => 'APC' },
-        0xa0 => { abbr => 'NBSP' },
-        0x200b => { abbr => 'ZWSP' },
-        0x200c => { abbr => 'ZWNJ' },
-        0x200d => { abbr => 'ZWJ' },
-        0x200e => { abbr => 'LRM' },   # LEFT-TO-RIGHT MARK
-        0x200f => { abbr => 'RLM' },   # RIGHT-TO-LEFT MARK
-        0x202a => { abbr => 'LRE' },   # LEFT-TO-RIGHT EMBEDDING
-        0x202b => { abbr => 'RLE' },   # RIGHT-TO-LEFT EMBEDDING
-        0x202c => { abbr => 'PDF' },   # POP DIRECTIONAL FORMATTING
-        0x202d => { abbr => 'LRO' },   # LEFT-TO-RIGHT OVERRIDE
-        0x202e => { abbr => 'RLO' },   # RIGHT-TO-LEFT OVERRIDE
-        0x202f => { abbr => 'NNBSP' }, # NARROW NO-BREAK SPACE
-        0x205f => { abbr => 'MMSP' },  # MEDIUM MATHEMATICAL SPACE
-        0x2060 => { abbr => 'WJ'   },  # WORD JOINER
-        0x2066 => { abbr => 'LRI'  },  # LEFT-TO-RIGHT ISOLATE
-        0x2067 => { abbr => 'RLI'  },  # RIGHT-TO-LEFT ISOLATE
-        0x2068 => { abbr => 'FSI'  },  # FIRST STRONG ISOLATE
-        0x2069 => { abbr => 'PDI'  },  # POP DIRECTIONAL ISOLATE
-        0xFE00 => { abbr => 'VS1' },   # VARIATION SELECTOR-1
-        0xFE01 => { abbr => 'VS2' },   # VARIATION SELECTOR-2
-        0xFE02 => { abbr => 'VS3' },   # VARIATION SELECTOR-3
-        0xFE03 => { abbr => 'VS4' },   # VARIATION SELECTOR-4
-        0xFE04 => { abbr => 'VS5' },   # VARIATION SELECTOR-5
-        0xFE05 => { abbr => 'VS6' },   # VARIATION SELECTOR-6
-        0xFE06 => { abbr => 'VS7' },   # VARIATION SELECTOR-7
-        0xFE07 => { abbr => 'VS8' },   # VARIATION SELECTOR-8
-        0xFE08 => { abbr => 'VS9' },   # VARIATION SELECTOR-9
-        0xFE09 => { abbr => 'VS10' },  # VARIATION SELECTOR-10
-        0xFE0A => { abbr => 'VS11' },  # VARIATION SELECTOR-11
-        0xFE0B => { abbr => 'VS12' },  # VARIATION SELECTOR-12
-        0xFE0C => { abbr => 'VS13' },  # VARIATION SELECTOR-13
-        0xFE0D => { abbr => 'VS14' },  # VARIATION SELECTOR-14
-        0xFE0E => { abbr => 'VS15' },  # VARIATION SELECTOR-15
-        0xFE0F => { abbr => 'VS16' },  # VARIATION SELECTOR-16
-        0xFEFF => { abbr => 'ZWNBSP', abbr2 => 'BOM' }, # ZERO WIDTH NO-BREAK SPACE (BYTE ORDER MARK)
-        0x070f => { abbr => 'SAM' }, # SYRIAC ABBREVIATION MARK
-   );
+    our %CHAR_INFO_2 = (
+        0   => { graph => 0, control => 1, abbr => "NUL" },
+        1   => { graph => 0, control => 1, abbr => "SOH" },
+        2   => { graph => 0, control => 1, abbr => "STX" },
+        3   => { graph => 0, control => 1, abbr => "ETX" },
+        4   => { graph => 0, control => 1, abbr => "EOT" },
+        5   => { graph => 0, control => 1, abbr => "ENQ" },
+        6   => { graph => 0, control => 1, abbr => "ACK" },
+        7   => { graph => 0, control => 1, abbr => "BEL", esc => "\\a", alt_name => "ALERT" },
+        8   => { graph => 0, control => 1, abbr => "BS",  esc => "\\b"  },
+        9   => { graph => 0, control => 1, abbr => "HT",  esc => "\\t", alt_name => "HORIZONTAL TABULATION" },
+        10  => { graph => 0, control => 1, abbr => "LF",  esc => "\\n"  },
+        11  => { graph => 0, control => 1, abbr => "VT",  esc => "\\v", alt_name => "VERTICAL TABULATION" },
+        12  => { graph => 0, control => 1, abbr => "FF",  esc => "\\f"  },
+        13  => { graph => 0, control => 1, abbr => "CR",  esc => "\\r"  },
+        14  => { graph => 0, control => 1, abbr => "SO"  },
+        15  => { graph => 0, control => 1, abbr => "SI"  },
+        16  => { graph => 0, control => 1, abbr => "DLE" },
+        17  => { graph => 0, control => 1, abbr => "DC1", alt_name => "XON" },
+        18  => { graph => 0, control => 1, abbr => "DC2" },
+        19  => { graph => 0, control => 1, abbr => "DC3", alt_name => "XOFF" },
+        20  => { graph => 0, control => 1, abbr => "DC4" },
+        21  => { graph => 0, control => 1, abbr => "NAK" },
+        22  => { graph => 0, control => 1, abbr => "SYN" },
+        23  => { graph => 0, control => 1, abbr => "ETB" },
+        24  => { graph => 0, control => 1, abbr => "CAN" },
+        25  => { graph => 0, control => 1, abbr => "EM"  },
+        26  => { graph => 0, control => 1, abbr => "SUB" },
+        27  => { graph => 0, control => 1, abbr => "ESC" },
+        28  => { graph => 0, control => 1, abbr => "FS", alt_name => "FILE SEPARATOR"  },
+        29  => { graph => 0, control => 1, abbr => "GS", alt_name => "GROUP SEPARATOR"  },
+        30  => { graph => 0, control => 1, abbr => "RS", alt_name => "RECORD SEPARATOR"  },
+        31  => { graph => 0, control => 1, abbr => "US", alt_name => "UNIT SEPARATOR"  },
+        32  => { graph => 0, control => 0, abbr => "SP"  },
+        127 => { graph => 0, control => 1, abbr => "DEL" },
+        128 => { graph => 0, control => 1, abbr => "PAD", abbr_unofficial => 1, alt_name => "PADDING CHARACTER" },
+        129 => { graph => 0, control => 1, abbr => "HOP", abbr_unofficial => 1, alt_name => "HIGH OCTET PRESET" },
+        130 => { graph => 0, control => 1, abbr => "BPH" },
+        131 => { graph => 0, control => 1, abbr => "NBH" },
+        132 => { graph => 0, control => 1, abbr => "IND", abbr_deprecated => 1, alt_name => "INDEX" },
+        133 => { graph => 0, control => 1, abbr => "NEL" },
+        134 => { graph => 0, control => 1, abbr => "SSA" },
+        135 => { graph => 0, control => 1, abbr => "ESA" },
+        136 => { graph => 0, control => 1, abbr => "HTS", alt_name => "HORIZONTAL TABULATION SET" },
+        137 => { graph => 0, control => 1, abbr => "HTJ", alt_name => "HORIZONTAL TABULATION WITH JUSTIFICATION" },
+        138 => { graph => 0, control => 1, abbr => "VTS", alt_name => "VERTICAL TABULATION SET" },
+        139 => { graph => 0, control => 1, abbr => "PLD", alt_name => "PARTIAL LINE DOWN" },
+        140 => { graph => 0, control => 1, abbr => "PLU", alt_name => "PARTIAL LINE UP" },
+        141 => { graph => 0, control => 1, abbr => "RI", alt_name => "REVERSE INDEX" },
+        142 => { graph => 0, control => 1, abbr => "SS2" },
+        143 => { graph => 0, control => 1, abbr => "SS3" },
+        144 => { graph => 0, control => 1, abbr => "DCS" },
+        145 => { graph => 0, control => 1, abbr => "PU1" },
+        146 => { graph => 0, control => 1, abbr => "PU2" },
+        147 => { graph => 0, control => 1, abbr => "STS" },
+        148 => { graph => 0, control => 1, abbr => "CCH" },
+        149 => { graph => 0, control => 1, abbr => "MW" },
+        150 => { graph => 0, control => 1, abbr => "SPA", alt_name => "START OF GUARDED AREA" },
+        151 => { graph => 0, control => 1, abbr => "EPA", alt_name => "END OF GUARDED AREA" },
+        152 => { graph => 0, control => 1, abbr => "SOS" },
+        153 => { graph => 0, control => 1, abbr => "SGC", alt_name => "SINGLE GRAPHIC CHARACTER INTRODUCER" },
+        154 => { graph => 0, control => 1, abbr => "SCI" },
+        155 => { graph => 0, control => 1, abbr => "CSI" },
+        156 => { graph => 0, control => 1, abbr => "ST" },
+        157 => { graph => 0, control => 1, abbr => "OSC" },
+        158 => { graph => 0, control => 1, abbr => "PM" },
+        159 => { graph => 0, control => 1, abbr => "ASC" },
+        160 => { graph => 0, control => 0, abbr => "NBSP" },
+    );
 }
