@@ -9,11 +9,11 @@ use Unicode::UCD qw(charinfo);
 use Text::Wrap qw(wrap);
 use POSIX qw(dup dup2);
 
-our $ascii   = 1;
-our $latin_1 = 0;
-our $base    = 16;
+our $ascii      = 1;
+our $latin_1    = 0;
+our $base       = 16;
 our $table_type = 1;
-our $row_major = 0;
+our $row_major  = 0;
 
 Getopt::Long::Configure(qw(gnu_getopt));
 Getopt::Long::GetOptions("l|latin-1"           => \$latin_1,
