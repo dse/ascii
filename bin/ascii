@@ -27,10 +27,19 @@ Getopt::Long::GetOptions("l|latin-1"           => \$latin_1,
                          "1"                   => sub { $table_type = 1; },
                          "2"                   => sub { $table_type = 2; },
                          "3"                   => sub { $table_type = 3; },
-) or die(":-(");
+                         "help|?"              => sub { usage(); exit(0); },
+                     ) or die("Type 'ascii --help' for help.\n");
+
+sub usage { print <<EOF; }
+ascii [-l|--latin-1] [-L|--latin-1-only] [-A|--no-ascii]
+      [-h|--hex[adecimal]] [-d|--dec[imal]] [-o|--oct[al]]
+      [-1|--table-type-1] [-2|--table-type-2] [-3|--table-type-3]
+      [-r|--row-major]
+EOF
 
 if (($table_type <= 1 || $table_type == 3) && $row_major) {
-    die("ascii: --row-major does not make sense with table type $table_type\n");
+    warn("ascii: --row-major does not make sense with table type $table_type\n");
+    die("Type 'ascii --help' for help.\n");
 }
 
 if (!$ascii && !$latin_1) {
@@ -190,7 +199,7 @@ INIT {
 
     # Silence a warning when not running in a TTY, part 2, restore
     # stderr.
-    dup2($fd, $stderr_fd);
+    open(\*STDERR, ">&$stderr_fd");
     close($fd);
 }
 
