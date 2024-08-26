@@ -3,19 +3,19 @@ use warnings;
 use strict;
 use Getopt::Long;
 
-our $use_controls = 0;
-our $use_row_major = 0;
-our $use_hex = 0;
-our $use_oct = 0;
+our $opt_controls = 0;
+our $opt_row_major = 0;
+our $opt_hex = 0;
+our $opt_oct = 0;
 
 Getopt::Long::Configure(qw(gnu_getopt));
 Getopt::Long::GetOptions(
-    "h|hex" => sub { $use_hex = 1; $use_oct = 0; },
-    "o|oct" => sub { $use_hex = 0; $use_oct = 1; },
-    "d|dec" => sub { $use_hex = 0; $use_oct = 0; },
-    "R|row-major" => sub { $use_row_major = 1; },
-    "C|column-major" => sub { $use_row_major = 0; },
-    "c|controls"     => sub { $use_controls = 1; },
+    "h|hex" => sub { $opt_hex = 1; $opt_oct = 0; },
+    "o|oct" => sub { $opt_hex = 0; $opt_oct = 1; },
+    "d|dec" => sub { $opt_hex = 0; $opt_oct = 0; },
+    "R|row-major" => sub { $opt_row_major = 1; },
+    "C|column-major" => sub { $opt_row_major = 0; },
+    "c|controls"     => sub { $opt_controls = 1; },
 ) or die(":-(\n");
 
 our %ABBR;
@@ -24,9 +24,9 @@ our %CHARINFO;
 our %UNICODE;
 
 sub main {
-    if ($use_controls) {
+    if ($opt_controls) {
         output_column_major_controls();
-    } elsif ($use_row_major) {
+    } elsif ($opt_row_major) {
         output_row_major_table();
     } else {
         output_column_major_table();
@@ -34,10 +34,10 @@ sub main {
 }
 
 sub output_column_major_table {
-    if ($use_hex) {
+    if ($opt_hex) {
         print("    | 0x0_ 0x1_ 0x2_ 0x3_ 0x4_ 0x5_ 0x6_ 0x7_\n");
         print("----|----------------------------------------\n");
-    } elsif ($use_oct) {
+    } elsif ($opt_oct) {
         output_column_major_table_2();
         return;
     } else {
@@ -45,7 +45,7 @@ sub output_column_major_table {
         print("----|----------------------------------------\n");
     }
     for (my $row = 0; $row < 16; $row += 1) {
-        if ($use_hex) {
+        if ($opt_hex) {
             printf(" _%1x | ", $row);
         } else {
             printf("/%-2d | ", $row);
@@ -62,9 +62,9 @@ sub output_column_major_table_2 {
             if ($col) {
                 print("  ");
             }
-            if ($use_hex) {
+            if ($opt_hex) {
                 printf("0x%02x %-3s", $code, abbr_3($code));
-            } elsif ($use_oct) {
+            } elsif ($opt_oct) {
                 printf("%4s %-3s", sprintf("0%o", $code), abbr_3($code));
             } else {
                 printf(" %3d %-3s", $code, abbr_3($code));
@@ -81,9 +81,9 @@ sub output_row_major_table_2 {
             if ($col) {
                 print("  ");
             }
-            if ($use_hex) {
+            if ($opt_hex) {
                 printf("0x%02x %-3s", $code, abbr_3($code));
-            } elsif ($use_oct) {
+            } elsif ($opt_oct) {
                 printf("%4s %-3s", sprintf("0%o", $code), abbr_3($code));
             } else {
                 printf(" %3d %-3s", $code, abbr_3($code));
@@ -95,10 +95,10 @@ sub output_row_major_table_2 {
 
 sub output_row_major_table {
     my @column_numbers = (0..15);
-    if ($use_hex) {
+    if ($opt_hex) {
         print("     | _0  _1  _2  _3  _4  _5  _6  _7  _8  _9  _a  _b  _c  _d  _e  _f\n");
         print("-----|----------------------------------------------------------------\n");
-    } elsif ($use_oct) {
+    } elsif ($opt_oct) {
         output_row_major_table_2();
         return;
     } else {
@@ -107,7 +107,7 @@ sub output_row_major_table {
     }
     for (my $row = 0; $row < 8; $row += 1) {
         my @codes = (($row * 16) .. ($row * 16 + 15));
-        if ($use_hex) {
+        if ($opt_hex) {
             printf("0x%1x_ | ", $row);
         } else {
             printf(" %-2d/ | ", $row);
@@ -122,12 +122,12 @@ sub abbr_3 {
 }
 
 sub output_column_major_controls {
-    if ($use_hex) {
+    if ($opt_hex) {
         # print("      0x0_                                 0x1_\n");
         # print("--- | ------------------------------------ ------------------------------------\n");
         output_column_major_controls_2();
         return;
-    } elsif ($use_oct) {
+    } elsif ($opt_oct) {
         output_column_major_controls_2();
         return;
     } else {
@@ -135,7 +135,7 @@ sub output_column_major_controls {
         print("--- | ------------------------------------ ------------------------------------\n");
     }
     for (my $row = 0; $row < 16; $row += 1) {
-        if ($use_hex) {
+        if ($opt_hex) {
             printf("%3x |", $row);
         } else {
             printf("/%-2d |", $row);
@@ -147,7 +147,7 @@ sub output_column_major_controls {
         print("\n");
     }
     print("\n");
-    if ($use_hex) {
+    if ($opt_hex) {
         print(" 0x20 = SP  SPACE\n");
         print(" 0x7f = DEL DELETE\n");
     } else {
@@ -161,9 +161,9 @@ sub output_column_major_controls_2 {
         for (my $col = 0; $col < 32; $col += 16) {
             my $code = $row + $col;
             print("  ") if $col;
-            if ($use_hex) {
+            if ($opt_hex) {
                 printf("0x%02x", $code);
-            } elsif ($use_oct) {
+            } elsif ($opt_oct) {
                 printf("%4s", sprintf("0%o", $code));
             } else {
                 printf(" %3d", $code);
@@ -173,10 +173,10 @@ sub output_column_major_controls_2 {
         print("\n");
     }
     print("\n");
-    if ($use_hex) {
+    if ($opt_hex) {
         print("0x20 = SP  SPACE\n");
         print("0x7f = DEL DELETE\n");
-    } elsif ($use_oct) {
+    } elsif ($opt_oct) {
         print(" 040 SP  SPACE\n");
         print("0177 DEL DELETE\n");
     } else {
