@@ -51,7 +51,7 @@ sub output_column_major_table {
             printf("/%-2d | ", $row);
         }
         my @codes = map { $row + 16 * $_ } (0..7);
-        print(join("  ", map { abbr_3($_) } @codes), "\n");
+        print(join("  ", map { char_abbr($_) } @codes), "\n");
     }
 }
 
@@ -63,11 +63,11 @@ sub output_column_major_table_2 {
                 print("  ");
             }
             if ($opt_hex) {
-                printf("0x%02x %-3s", $code, abbr_3($code));
+                printf("0x%02x %-3s", $code, char_abbr($code));
             } elsif ($opt_oct) {
-                printf("%4s %-3s", sprintf("0%o", $code), abbr_3($code));
+                printf("%4s %-3s", sprintf("0%o", $code), char_abbr($code));
             } else {
-                printf(" %3d %-3s", $code, abbr_3($code));
+                printf(" %3d %-3s", $code, char_abbr($code));
             }
         }
         print("\n");
@@ -82,11 +82,11 @@ sub output_row_major_table_2 {
                 print("  ");
             }
             if ($opt_hex) {
-                printf("0x%02x %-3s", $code, abbr_3($code));
+                printf("0x%02x %-3s", $code, char_abbr($code));
             } elsif ($opt_oct) {
-                printf("%4s %-3s", sprintf("0%o", $code), abbr_3($code));
+                printf("%4s %-3s", sprintf("0%o", $code), char_abbr($code));
             } else {
-                printf(" %3d %-3s", $code, abbr_3($code));
+                printf(" %3d %-3s", $code, char_abbr($code));
             }
         }
         print("\n");
@@ -112,11 +112,11 @@ sub output_row_major_table {
         } else {
             printf(" %-2d/ | ", $row);
         }
-        print(join(" ", map { abbr_3($_) } @codes), "\n");
+        print(join(" ", map { char_abbr($_) } @codes), "\n");
     }
 }
 
-sub abbr_3 {
+sub char_abbr {
     my ($code) = @_;
     return sprintf("%-3s", $CHARINFO{$code}{abbr} // (' ' . chr($code)));
 }
@@ -142,7 +142,7 @@ sub output_column_major_controls {
         }
         for (my $col = 0; $col <= 1; $col += 1) {
             my $code = $col * 16 + $row;
-            printf(" %-3s %-32.32s", abbr_3($code), $UNICODE{$code}{name});
+            printf(" %-3s %-32.32s", char_abbr($code), $UNICODE{$code}{name});
         }
         print("\n");
     }
@@ -168,7 +168,7 @@ sub output_column_major_controls_2 {
             } else {
                 printf(" %3d", $code);
             }
-            printf(" %-3s %-29.29s", abbr_3($code), $UNICODE{$code}{name});
+            printf(" %-3s %-29.29s", char_abbr($code), $UNICODE{$code}{name});
         }
         print("\n");
     }
