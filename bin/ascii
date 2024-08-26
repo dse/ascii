@@ -3,6 +3,7 @@ use warnings;
 use strict;
 use Getopt::Long;
 
+our $use_controls = 0;
 our $use_row_major = 0;
 our $use_hex = 0;
 our $use_oct = 0;
@@ -14,6 +15,7 @@ Getopt::Long::GetOptions(
     "d|dec" => sub { $use_hex = 0; $use_oct = 0; },
     "R|row-major" => sub { $use_row_major = 1; },
     "C|column-major" => sub { $use_row_major = 0; },
+    "c|controls"     => sub { $use_controls = 1; },
 ) or die(":-(\n");
 
 our %ABBR;
@@ -22,7 +24,9 @@ our %CHARINFO;
 our %UNICODE;
 
 sub main {
-    if ($use_row_major) {
+    if ($use_controls) {
+        output_column_major_controls();
+    } elsif ($use_row_major) {
         output_row_major_table();
     } else {
         output_column_major_table();
@@ -119,8 +123,13 @@ sub abbr_3 {
 
 sub output_column_major_controls {
     if ($use_hex) {
-        print("      0x0_                                 0x1_\n");
-        print("--- | ------------------------------------ ------------------------------------\n");
+        # print("      0x0_                                 0x1_\n");
+        # print("--- | ------------------------------------ ------------------------------------\n");
+        output_column_major_controls_2();
+        return;
+    } elsif ($use_oct) {
+        output_column_major_controls_2();
+        return;
     } else {
         print("      0/                                   1/\n");
         print("--- | ------------------------------------ ------------------------------------\n");
@@ -144,6 +153,35 @@ sub output_column_major_controls {
     } else {
         print(" 2/0  = SP  SPACE\n");
         print(" 7/15 = DEL DELETE\n");
+    }
+}
+
+sub output_column_major_controls_2 {
+    for (my $row = 0; $row < 16; $row += 1) {
+        for (my $col = 0; $col < 32; $col += 16) {
+            my $code = $row + $col;
+            print("  ") if $col;
+            if ($use_hex) {
+                printf("0x%02x", $code);
+            } elsif ($use_oct) {
+                printf("%4s", sprintf("0%o", $code));
+            } else {
+                printf(" %3d", $code);
+            }
+            printf(" %-3s %-29.29s", abbr_3($code), $UNICODE{$code}{name});
+        }
+        print("\n");
+    }
+    print("\n");
+    if ($use_hex) {
+        print("0x20 = SP  SPACE\n");
+        print("0x7f = DEL DELETE\n");
+    } elsif ($use_oct) {
+        print(" 040 SP  SPACE\n");
+        print("0177 DEL DELETE\n");
+    } else {
+        print("2/0  = SP  SPACE\n");
+        print("7/15 = DEL DELETE\n");
     }
 }
 
