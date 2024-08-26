@@ -7,16 +7,20 @@ our $opt_controls = 0;
 our $opt_row_major = 0;
 our $opt_hex = 0;
 our $opt_oct = 0;
+our $opt_that_notation = 1;     # what do they call that 0/15 thing?
 
 Getopt::Long::Configure(qw(gnu_getopt));
 Getopt::Long::GetOptions(
-    "h|hex" => sub { $opt_hex = 1; $opt_oct = 0; },
-    "o|oct" => sub { $opt_hex = 0; $opt_oct = 1; },
-    "d|dec" => sub { $opt_hex = 0; $opt_oct = 0; },
-    "R|row-major" => sub { $opt_row_major = 1; },
-    "C|column-major" => sub { $opt_row_major = 0; },
-    "c|controls"     => sub { $opt_controls = 1; },
+    "h|hex|hexadecimal" => sub { $opt_that_notation = 0; $opt_hex = 1; $opt_oct = 0; },
+    "o|oct|octal"       => sub { $opt_that_notation = 0; $opt_hex = 0; $opt_oct = 1; },
+    "d|dec|decimal"     => sub { $opt_that_notation = 0; $opt_hex = 0; $opt_oct = 0; },
+    "that-notation"     => sub { $opt_that_notation = 1; $opt_hex = 0; $opt_oct = 0; },
+    "R|row-major"       => sub { $opt_row_major = 1; },
+    "C|column-major"    => sub { $opt_row_major = 0; },
+    "c|controls"        => sub { $opt_controls = 1; },
 ) or die(":-(\n");
+
+my $opt_dec = !$opt_hex && !$opt_oct && !$opt_that_notation;
 
 our %ABBR;
 our %CHARINFO_ECMA_48;
@@ -37,7 +41,7 @@ sub output_column_major_table {
     if ($opt_hex) {
         print("    | 0x0_ 0x1_ 0x2_ 0x3_ 0x4_ 0x5_ 0x6_ 0x7_\n");
         print("----|----------------------------------------\n");
-    } elsif ($opt_oct) {
+    } elsif ($opt_oct || $opt_dec) {
         output_column_major_table_2();
         return;
     } else {
@@ -62,13 +66,7 @@ sub output_column_major_table_2 {
             if ($col) {
                 print("  ");
             }
-            if ($opt_hex) {
-                printf("0x%02x %-3s", $code, char_abbr($code));
-            } elsif ($opt_oct) {
-                printf("%4s %-3s", sprintf("0%o", $code), char_abbr($code));
-            } else {
-                printf(" %3d %-3s", $code, char_abbr($code));
-            }
+            printf("%-4s %-3s", num_abbr($code), char_abbr($code));
         }
         print("\n");
     }
@@ -81,13 +79,7 @@ sub output_row_major_table_2 {
             if ($col) {
                 print("  ");
             }
-            if ($opt_hex) {
-                printf("0x%02x %-3s", $code, char_abbr($code));
-            } elsif ($opt_oct) {
-                printf("%4s %-3s", sprintf("0%o", $code), char_abbr($code));
-            } else {
-                printf(" %3d %-3s", $code, char_abbr($code));
-            }
+            printf("%-4s %-3s", num_abbr($code), char_abbr($code));
         }
         print("\n");
     }
@@ -98,7 +90,7 @@ sub output_row_major_table {
     if ($opt_hex) {
         print("     | _0  _1  _2  _3  _4  _5  _6  _7  _8  _9  _a  _b  _c  _d  _e  _f\n");
         print("-----|----------------------------------------------------------------\n");
-    } elsif ($opt_oct) {
+    } elsif ($opt_oct || $opt_dec) {
         output_row_major_table_2();
         return;
     } else {
@@ -110,7 +102,7 @@ sub output_row_major_table {
         if ($opt_hex) {
             printf("0x%1x_ | ", $row);
         } else {
-            printf(" %-2d/ | ", $row);
+            printf(" %2d/ | ", $row);
         }
         print(join(" ", map { char_abbr($_) } @codes), "\n");
     }
@@ -118,16 +110,14 @@ sub output_row_major_table {
 
 sub char_abbr {
     my ($code) = @_;
-    return sprintf("%-3s", $CHARINFO{$code}{abbr} // (' ' . chr($code)));
+    return sprintf("%-3s", $CHARINFO{$code}{abbr} // chr($code));
 }
 
 sub output_column_major_controls {
     if ($opt_hex) {
-        # print("      0x0_                                 0x1_\n");
-        # print("--- | ------------------------------------ ------------------------------------\n");
         output_column_major_controls_2();
         return;
-    } elsif ($opt_oct) {
+    } elsif ($opt_oct || $opt_dec) {
         output_column_major_controls_2();
         return;
     } else {
@@ -147,13 +137,8 @@ sub output_column_major_controls {
         print("\n");
     }
     print("\n");
-    if ($opt_hex) {
-        print(" 0x20 = SP  SPACE\n");
-        print(" 0x7f = DEL DELETE\n");
-    } else {
-        print(" 2/0  = SP  SPACE\n");
-        print(" 7/15 = DEL DELETE\n");
-    }
+    printf(" %s = SP  SPACE\n", num_abbr(32));
+    printf(" %s = DEL DELETE\n", num_abbr(127));
 }
 
 sub output_column_major_controls_2 {
@@ -161,28 +146,29 @@ sub output_column_major_controls_2 {
         for (my $col = 0; $col < 32; $col += 16) {
             my $code = $row + $col;
             print("  ") if $col;
-            if ($opt_hex) {
-                printf("0x%02x", $code);
-            } elsif ($opt_oct) {
-                printf("%4s", sprintf("0%o", $code));
-            } else {
-                printf(" %3d", $code);
-            }
+            print(num_abbr($code));
+            # if ($opt_hex) {
+            #     printf("0x%02x", $code);
+            # } elsif ($opt_oct) {
+            #     printf("%4s", sprintf("0%o", $code));
+            # } else {
+            #     printf(" %3d", $code);
+            # }
             printf(" %-3s %-29.29s", char_abbr($code), $UNICODE{$code}{name});
         }
         print("\n");
     }
     print("\n");
-    if ($opt_hex) {
-        print("0x20 = SP  SPACE\n");
-        print("0x7f = DEL DELETE\n");
-    } elsif ($opt_oct) {
-        print(" 040 SP  SPACE\n");
-        print("0177 DEL DELETE\n");
-    } else {
-        print("2/0  = SP  SPACE\n");
-        print("7/15 = DEL DELETE\n");
-    }
+    printf("%s SP  SPACE\n", num_abbr(32));
+    printf("%s DEL DELETE\n", num_abbr(127));
+}
+
+sub num_abbr {
+    my ($code) = @_;
+    return sprintf("%4s", sprintf("0%o", $code)) if $opt_oct;
+    return sprintf("0x%02x", $code) if $opt_hex;
+    return sprintf("%d/%-2d", int($code/16), $code%16) if $opt_that_notation;
+    return sprintf(" %3d", $code);
 }
 
  #  1  | SOH  DC1   !    1    A    Q    a    q
