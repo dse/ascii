@@ -2,15 +2,18 @@
 use warnings;
 use strict;
 use Getopt::Long;
+use open IO => qw(:locale);
 
 our $opt_controls = 0;
 our $opt_row_major = 0;
 our $opt_hex = 0;
 our $opt_oct = 0;
 our $opt_that_notation = 1;     # what do they call that 0/15 thing?
+our $opt_latin_1 = 0;
 
 Getopt::Long::Configure(qw(gnu_getopt));
 Getopt::Long::GetOptions(
+    "l|latin1|latin-1|iso88591|iso-8859-1" => \$opt_latin_1,
     "h|hex|hexadecimal" => sub { $opt_that_notation = 0; $opt_hex = 1; $opt_oct = 0; },
     "o|oct|octal"       => sub { $opt_that_notation = 0; $opt_hex = 0; $opt_oct = 1; },
     "d|dec|decimal"     => sub { $opt_that_notation = 0; $opt_hex = 0; $opt_oct = 0; },
@@ -39,14 +42,24 @@ sub main {
 
 sub output_column_major_table {
     if ($opt_hex) {
-        print("    | 0x0_ 0x1_ 0x2_ 0x3_ 0x4_ 0x5_ 0x6_ 0x7_\n");
-        print("----|----------------------------------------\n");
+        if ($opt_latin_1) {
+            print("    | 0x8_ 0x9_ 0xa_ 0xb_ 0xc_ 0xd_ 0xe_ 0xf_\n");
+            print("----|----------------------------------------\n");
+        } else {
+            print("    | 0x0_ 0x1_ 0x2_ 0x3_ 0x4_ 0x5_ 0x6_ 0x7_\n");
+            print("----|----------------------------------------\n");
+        }
     } elsif ($opt_oct || $opt_dec) {
         output_column_major_table_2();
         return;
     } else {
-        print("    | 0/   1/   2/   3/   4/   5/   6/   7/\n");
-        print("----|----------------------------------------\n");
+        if ($opt_latin_1) {
+            print("    | 8/   9/  10/  11/  12/  13/  14/  15/\n");
+            print("----|----------------------------------------\n");
+        } else {
+            print("    | 0/   1/   2/   3/   4/   5/   6/   7/\n");
+            print("----|----------------------------------------\n");
+        }
     }
     for (my $row = 0; $row < 16; $row += 1) {
         if ($opt_hex) {
@@ -54,14 +67,23 @@ sub output_column_major_table {
         } else {
             printf("/%-2d | ", $row);
         }
-        my @codes = map { $row + 16 * $_ } (0..7);
+        my @codes;
+        if ($opt_latin_1) {
+            @codes = map { $row + 16 * $_ } (8..15);
+        } else {
+            @codes = map { $row + 16 * $_ } (0..7);
+        }
         print(join("  ", map { char_abbr($_) } @codes), "\n");
     }
 }
 
 sub output_column_major_table_2 {
+    my ($start, $end) = (0, 128);
+    if ($opt_latin_1) {
+        ($start, $end) = (128, 256);
+    }
     for (my $row = 0; $row < 16; $row += 1) {
-        for (my $col = 0; $col < 128; $col += 16) {
+        for (my $col = $start; $col < $end; $col += 16) {
             my $code = $row + $col;
             if ($col) {
                 print("  ");
@@ -73,7 +95,11 @@ sub output_column_major_table_2 {
 }
 
 sub output_row_major_table_2 {
-    for (my $row = 0; $row < 128; $row += 8) {
+    my ($start, $end) = (0, 128);
+    if ($opt_latin_1) {
+        ($start, $end) = (128, 256);
+    }
+    for (my $row = $start; $row < $end; $row += 8) {
         for (my $col = 0; $col < 8; $col += 1) {
             my $code = $row + $col;
             if ($col) {
@@ -97,7 +123,11 @@ sub output_row_major_table {
         print("     | /0  /1  /2  /3  /4  /5  /6  /7  /8  /9  /10 /11 /12 /13 /14 /15\n");
         print("-----|----------------------------------------------------------------\n");
     }
-    for (my $row = 0; $row < 8; $row += 1) {
+    my ($start, $end) = (0, 8);
+    if ($opt_latin_1) {
+        ($start, $end) = (8, 16);
+    }
+    for (my $row = $start; $row < $end; $row += 1) {
         my @codes = (($row * 16) .. ($row * 16 + 15));
         if ($opt_hex) {
             printf("0x%1x_ | ", $row);
@@ -110,7 +140,15 @@ sub output_row_major_table {
 
 sub char_abbr {
     my ($code) = @_;
-    return sprintf("%-3s", $CHARINFO{$code}{abbr} // chr($code));
+    my $abbr = $CHARINFO{$code}{abbr} // $CHARINFO_ECMA_48{$code}{abbr};
+    if (!defined $abbr) {
+        if (($code >= 0 && $code < 32) || ($code >= 127 && $code < 160)) {
+            $abbr = "";
+        } else {
+            $abbr = chr($code);
+        }
+    }
+    return sprintf("%-3s", ($CHARINFO{$code}{abbr} // $CHARINFO_ECMA_48{$code}{abbr} // $abbr));
 }
 
 sub output_column_major_controls {
@@ -121,8 +159,13 @@ sub output_column_major_controls {
         output_column_major_controls_2();
         return;
     } else {
-        print("      0/                                   1/\n");
-        print("--- | ------------------------------------ ------------------------------------\n");
+        if ($opt_latin_1) {
+            print("      8/                                   9/\n");
+            print("--- | ------------------------------------ ------------------------------------\n");
+        } else {
+            print("      0/                                   1/\n");
+            print("--- | ------------------------------------ ------------------------------------\n");
+        }
     }
     for (my $row = 0; $row < 16; $row += 1) {
         if ($opt_hex) {
@@ -131,20 +174,17 @@ sub output_column_major_controls {
             printf("/%-2d |", $row);
         }
         for (my $col = 0; $col <= 1; $col += 1) {
-            my $code = $col * 16 + $row;
+            my $code = $col * 16 + $row + ($opt_latin_1 ? 128 : 0);
             printf(" %-3s %-32.32s", char_abbr($code), $UNICODE{$code}{name});
         }
         print("\n");
     }
-    print("\n");
-    printf(" %s = SP  SPACE\n", num_abbr(32));
-    printf(" %s = DEL DELETE\n", num_abbr(127));
 }
 
 sub output_column_major_controls_2 {
     for (my $row = 0; $row < 16; $row += 1) {
         for (my $col = 0; $col < 32; $col += 16) {
-            my $code = $row + $col;
+            my $code = $row + $col + ($opt_latin_1 ? 128 : 0);
             print("  ") if $col;
             print(num_abbr($code));
             # if ($opt_hex) {
@@ -171,27 +211,6 @@ sub num_abbr {
     return sprintf(" %3d", $code);
 }
 
- #  1  | SOH  DC1   !    1    A    Q    a    q
- #  2  | STX  DC2   "    2    B    R    b    r
- #  3  | ETX  DC3   #    3    C    S    c    s
- #  4  | EOT  DC4   $    4    D    T    d    t
- #  5  | ENQ  NAK   %    5    E    U    e    u
- #  6  | ACK  SYN   &    6    F    V    f    v
- #  7  | BEL  ETB   '    7    G    W    g    w
- #  8  | BS   CAN   (    8    H    X    h    x
- #  9  | HT   EM    )    9    I    Y    i    y
- # 10  | LF   SUB   *    :    J    Z    j    z
- # 11  | VT   ESC   +    ;    K    [    k    {
- # 12  | FF   FS    ,    <    L    \    l    |
- # 13  | CR   GS    -    =    M    ]    m    }
- # 14  | SO   RS    .    >    N    ^    n    ~
- # 15  | SI   US    /    ?    O    _    o   DEL
-# END
-
-sub table_1A { print(<<"END"); }
-
-END
-
 # h/t: https://vt100.net/annarbor/aaa-ug/appendixa.html
 %CHARINFO = (
     0   => { abbr => "NUL", },
@@ -208,12 +227,12 @@ END
     11  => { abbr => "VT",  },
     12  => { abbr => "FF",  },
     13  => { abbr => "CR",  },
-    14  => { abbr => "SO",  },
-    15  => { abbr => "SI",  },
+    14  => { abbr => "SO",  abbr_2 => "LS1", },
+    15  => { abbr => "SI",  abbr_2 => "LS0", },
     16  => { abbr => "DLE", },
-    17  => { abbr => "DC1", },
+    17  => { abbr => "DC1", abbr_2 => "XON", },
     18  => { abbr => "DC2", },
-    19  => { abbr => "DC3", },
+    19  => { abbr => "DC3", abbr_2 => "XOFF", },
     20  => { abbr => "DC4", },
     21  => { abbr => "NAK", },
     22  => { abbr => "SYN", },
@@ -248,9 +267,9 @@ END
     14  => { abbr => "SO",  abbr_2 => "LS1", },
     15  => { abbr => "SI",  abbr_2 => "LS0", },
     16  => { abbr => "DLE", },
-    17  => { abbr => "DC1", },
+    17  => { abbr => "DC1", abbr_2 => "XON", },
     18  => { abbr => "DC2", },
-    19  => { abbr => "DC3", },
+    19  => { abbr => "DC3", abbr_2 => "XOFF", },
     20  => { abbr => "DC4", },
     21  => { abbr => "NAK", },
     22  => { abbr => "SYN", },
