@@ -26,7 +26,6 @@ Getopt::Long::GetOptions(
 my $opt_dec = !$opt_hex && !$opt_oct && !$opt_that_notation;
 
 our %ABBR;
-our %CHARINFO_ECMA_48;
 our %CHARINFO;
 our %UNICODE;
 
@@ -140,7 +139,7 @@ sub output_row_major_table {
 
 sub char_abbr {
     my ($code) = @_;
-    my $abbr = $CHARINFO{$code}{abbr} // $CHARINFO_ECMA_48{$code}{abbr};
+    my $abbr = $CHARINFO{$code}{abbr};
     if (!defined $abbr) {
         if (($code >= 0 && $code < 32) || ($code >= 127 && $code < 160)) {
             $abbr = "";
@@ -148,7 +147,7 @@ sub char_abbr {
             $abbr = chr($code);
         }
     }
-    return sprintf("%-3s", ($CHARINFO{$code}{abbr} // $CHARINFO_ECMA_48{$code}{abbr} // $abbr));
+    return sprintf("%-3s", ($CHARINFO{$code}{abbr} // $abbr));
 }
 
 sub output_column_major_controls {
@@ -211,79 +210,43 @@ sub num_abbr {
     return sprintf(" %3d", $code);
 }
 
-# h/t: https://vt100.net/annarbor/aaa-ug/appendixa.html
 %CHARINFO = (
-    0   => { abbr => "NUL", },
-    1   => { abbr => "SOH", },
-    2   => { abbr => "STX", },
-    3   => { abbr => "ETX", },
-    4   => { abbr => "EOT", },
-    5   => { abbr => "ENQ", },
-    6   => { abbr => "ACK", },
-    7   => { abbr => "BEL", },
-    8   => { abbr => "BS",  },
-    9   => { abbr => "HT",  },
-    10  => { abbr => "LF",  },
-    11  => { abbr => "VT",  },
-    12  => { abbr => "FF",  },
-    13  => { abbr => "CR",  },
-    14  => { abbr => "SO",  abbr_2 => "LS1", },
-    15  => { abbr => "SI",  abbr_2 => "LS0", },
-    16  => { abbr => "DLE", },
-    17  => { abbr => "DC1", abbr_2 => "XON", },
-    18  => { abbr => "DC2", },
-    19  => { abbr => "DC3", abbr_2 => "XOFF", },
-    20  => { abbr => "DC4", },
-    21  => { abbr => "NAK", },
-    22  => { abbr => "SYN", },
-    23  => { abbr => "ETB", },
-    24  => { abbr => "CAN", },
-    25  => { abbr => "EM",  },
-    26  => { abbr => "SUB", },
-    27  => { abbr => "ESC", },
-    28  => { abbr => "FS",  },
-    29  => { abbr => "GS",  },
-    30  => { abbr => "RS",  },
-    31  => { abbr => "US",  },
-    32  => { abbr => "SP",  },
-    127 => { abbr => "DEL", },
-);
-
-%CHARINFO_ECMA_48 = (
-    0   => { abbr => "NUL", },
-    1   => { abbr => "SOH", },
-    2   => { abbr => "STX", },
-    3   => { abbr => "ETX", },
-    4   => { abbr => "EOT", },
-    5   => { abbr => "ENQ", },
-    6   => { abbr => "ACK", },
-    7   => { abbr => "BEL", },
-    8   => { abbr => "BS",  },
-    9   => { abbr => "HT",  },
-    10  => { abbr => "LF",  },
-    11  => { abbr => "VT",  },
-    12  => { abbr => "FF",  },
-    13  => { abbr => "CR",  },
-    14  => { abbr => "SO",  abbr_2 => "LS1", },
-    15  => { abbr => "SI",  abbr_2 => "LS0", },
-    16  => { abbr => "DLE", },
-    17  => { abbr => "DC1", abbr_2 => "XON", },
-    18  => { abbr => "DC2", },
-    19  => { abbr => "DC3", abbr_2 => "XOFF", },
-    20  => { abbr => "DC4", },
-    21  => { abbr => "NAK", },
-    22  => { abbr => "SYN", },
-    23  => { abbr => "ETB", },
-    24  => { abbr => "CAN", },
-    25  => { abbr => "EM",  },
-    26  => { abbr => "SUB", },
-    27  => { abbr => "ESC", },
-    28  => { abbr => "IS4", },
-    29  => { abbr => "IS3", },
-    30  => { abbr => "IS2", },
-    31  => { abbr => "IS1", },
-    32  => { abbr => "SP",  },
-    127 => { abbr => "DEL", },
+    # h/t: https://vt100.net/annarbor/aaa-ug/appendixa.html
+    # two_letter codes from VT240 Programmer Reference Manual p. 34
+    0   => { abbr => "NUL", two_letter => "NU" },
+    1   => { abbr => "SOH", two_letter => "SH" },
+    2   => { abbr => "STX", two_letter => "SX" },
+    3   => { abbr => "ETX", two_letter => "EX" },
+    4   => { abbr => "EOT", two_letter => "ET" },
+    5   => { abbr => "ENQ", two_letter => "EQ" },
+    6   => { abbr => "ACK", two_letter => "AK" },
+    7   => { abbr => "BEL", two_letter => "BL" },
+    8   => { abbr => "BS",  two_letter => "BS" },
+    9   => { abbr => "HT",  two_letter => "HT" },
+    10  => { abbr => "LF",  two_letter => "LF" },
+    11  => { abbr => "VT",  two_letter => "VT" },
+    12  => { abbr => "FF",  two_letter => "FF" },
+    13  => { abbr => "CR",  two_letter => "CR" },
+    14  => { abbr => "SO",  ecma_48 => "SO", ecma_48_alt => "LS1", two_letter => "SO", abbr_2 => "LS1", },
+    15  => { abbr => "SI",  ecma_48 => "SI", ecma_48_alt => "LS0", two_letter => "SI", abbr_2 => "LS0", },
+    16  => { abbr => "DLE", two_letter => "DL" },
+    17  => { abbr => "DC1", two_letter => "D1", abbr_2 => "XON", },
+    18  => { abbr => "DC2", two_letter => "D2" },
+    19  => { abbr => "DC3", two_letter => "D3", abbr_2 => "XOFF", },
+    20  => { abbr => "DC4", two_letter => "D4" },
+    21  => { abbr => "NAK", two_letter => "NK" },
+    22  => { abbr => "SYN", two_letter => "SY" },
+    23  => { abbr => "ETB", two_letter => "EB" },
+    24  => { abbr => "CAN", two_letter => "CN" },
+    25  => { abbr => "EM",  two_letter => "EM" },
+    26  => { abbr => "SUB", two_letter => "XX" },
+    27  => { abbr => "ESC", two_letter => "EC" },
+    28  => { abbr => "IS4", two_letter => "FS", ecma_48 => "IS4", ansi => "FS" },
+    29  => { abbr => "IS3", two_letter => "GS", ecma_48 => "IS3", ansi => "GS" },
+    30  => { abbr => "IS2", two_letter => "RS", ecma_48 => "IS2", ansi => "RS" },
+    31  => { abbr => "IS1", two_letter => "US", ecma_48 => "IS1", ansi => "US" },
+    32  => { abbr => "SP",  two_letter => "SP" },
+    127 => { abbr => "DEL", two_letter => "SP" },
     130 => { abbr => "BPH", },
     131 => { abbr => "NBH", },
     132 => { abbr => "IND", },
