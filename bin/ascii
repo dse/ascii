@@ -213,6 +213,10 @@ sub num_abbr {
 %CHARINFO = (
     # h/t: https://vt100.net/annarbor/aaa-ug/appendixa.html
     # two_letter codes from VT240 Programmer Reference Manual p. 34
+    # http://zuga.net/articles/unicode/character/0080/
+    # http://zuga.net/articles/unicode/character/0081/
+    # http://zuga.net/articles/unicode/character/0084/
+    # http://zuga.net/articles/unicode/character/0099/
     0   => { abbr => "NUL", two_letter => "NU" },
     1   => { abbr => "SOH", two_letter => "SH" },
     2   => { abbr => "STX", two_letter => "SX" },
@@ -222,9 +226,9 @@ sub num_abbr {
     6   => { abbr => "ACK", two_letter => "AK" },
     7   => { abbr => "BEL", two_letter => "BL" },
     8   => { abbr => "BS",  two_letter => "BS" },
-    9   => { abbr => "HT",  two_letter => "HT" },
+    9   => { abbr => "HT",  two_letter => "HT", alt_name => "HORIZONTAL TAB" },
     10  => { abbr => "LF",  two_letter => "LF" },
-    11  => { abbr => "VT",  two_letter => "VT" },
+    11  => { abbr => "VT",  two_letter => "VT", alt_name => "VERTICAL TAB" },
     12  => { abbr => "FF",  two_letter => "FF" },
     13  => { abbr => "CR",  two_letter => "CR" },
     14  => { abbr => "SO",  ecma_48 => "SO", ecma_48_alt => "LS1", two_letter => "SO", abbr_2 => "LS1", },
@@ -241,15 +245,17 @@ sub num_abbr {
     25  => { abbr => "EM",  two_letter => "EM" },
     26  => { abbr => "SUB", two_letter => "XX" },
     27  => { abbr => "ESC", two_letter => "EC" },
-    28  => { abbr => "IS4", two_letter => "FS", ecma_48 => "IS4", ansi => "FS" },
-    29  => { abbr => "IS3", two_letter => "GS", ecma_48 => "IS3", ansi => "GS" },
-    30  => { abbr => "IS2", two_letter => "RS", ecma_48 => "IS2", ansi => "RS" },
-    31  => { abbr => "IS1", two_letter => "US", ecma_48 => "IS1", ansi => "US" },
+    28  => { abbr => "IS4", two_letter => "FS", ecma_48 => "IS4", ansi => "FS", alt_name => "FILE SEPARATOR" },
+    29  => { abbr => "IS3", two_letter => "GS", ecma_48 => "IS3", ansi => "GS", alt_name => "GROUP SEPARATOR" },
+    30  => { abbr => "IS2", two_letter => "RS", ecma_48 => "IS2", ansi => "RS", alt_name => "RECORD SEPARATOR" },
+    31  => { abbr => "IS1", two_letter => "US", ecma_48 => "IS1", ansi => "US", alt_name => "UNIT SEPARATOR" },
     32  => { abbr => "SP",  two_letter => "SP" },
     127 => { abbr => "DEL", two_letter => "SP" },
+    128 => { abbr => "PAD", not_ecma_48 => 1, name => "PADDING CHARACTER" },
+    129 => { abbr => "HOP", not_ecma_48 => 1, name => "HIGH OCTET PRESET" },
     130 => { abbr => "BPH", },
     131 => { abbr => "NBH", },
-    132 => { abbr => "IND", },
+    132 => { abbr => "IND", not_ecma_48 => 1, name => "INDEX" },
     133 => { abbr => "NEL", },
     134 => { abbr => "SSA", },
     135 => { abbr => "ESA", },
@@ -270,6 +276,7 @@ sub num_abbr {
     150 => { abbr => "SPA", },
     151 => { abbr => "EPA", },
     152 => { abbr => "SOS", },
+    153 => { abbr => "SGC", not_ecma_48 => 1, name => "SINGLE GRAPHIC CHARACTER INTRODUCER" },
     154 => { abbr => "SCI", },
     155 => { abbr => "CSI", },
     156 => { abbr => "ST", },
